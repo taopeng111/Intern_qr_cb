@@ -105,7 +105,6 @@ daily_mean = df_all.groupby("date")["close"].mean()
 - 每日运行的抓取脚本自动去重和增量更新，无需担心重复数据
 - 数据中不包含退市标的，如需补全请联系维护人
 - 如需对接回测框架，可在 `data_handler.py` 中直接加载以上文件，按 symbol + date 切片并逐日推送
-- 如发现数据问题或有改进建议，欢迎 issue 或邮件反馈
 
 ---
 
