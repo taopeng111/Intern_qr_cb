@@ -7,14 +7,31 @@
 - `data/`  
   - `fetch_cb_data.py`：可转债日行情数据抓取脚本（基于 akshare）。
   - `cb_SH_2024.csv`、`cb_SZ_2024.csv`：沪深两市可转债日行情数据。
+  - `generate_conversion_table.py`：拉取沪深两市可转债基础信息，生成转股价映射表 `conversion_price_table.csv`。
+  - `conversion_price_table.csv`：可转债与正股、转股价的标准化映射表，由 `generate_conversion_table.py` 生成。
 - `perf_metrics.py`  
   量化策略绩效评估函数，包括年化收益、Sharpe/Sortino/Calmar 比率、最大回撤、VaR、CVaR 等常用指标及可视化工具。
 - `CB_Data_Dictionary.txt`  
   可转债市场基础知识、交易规则、常用字段说明与数据字典。
 - `strategies/`  
+  - `low_premium_strategy.py`：低转股溢价+破净可转债选券策略模块，包含数据读取、mock正股数据、映射表读取与核心选券函数。
   预留策略开发目录。
 - `framwork/`  
   预留回测框架目录。
+
+## 新增功能说明
+
+- `data/generate_conversion_table.py`：
+  使用 akshare 拉取沪深两市全部可转债基础信息，生成标准化的转股价映射表 `conversion_price_table.csv`，为策略与数据处理提供基础支撑。
+
+- `strategies/low_premium_strategy.py`：
+  实现低溢价可转债选券策略，包含：
+  - `get_day_data`：读取指定日期的可转债日线数据（合并沪深两市）。
+  - `get_equity_day_data`：mock 版正股日线数据接口，便于后续替换为真实数据。
+  - `load_conversion_table`：读取转股价映射表。
+  - `select_low_premium_cb`：核心选券函数，基于转股溢价和破净因子筛选前N只可转债。
+
+如需使用上述功能，请参考对应脚本内注释与用法说明。
 
 ## 依赖环境
 
