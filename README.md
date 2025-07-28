@@ -1,127 +1,181 @@
-# 中国可转债量化回测与绩效评估框架
+# 中国可转债量化回测框架
 
-本项目为中国可转债量化策略研究提供数据抓取、绩效评估与市场信息支持。
+一个完整的可转债量化策略回测框架，支持事件驱动架构、多策略开发和专业绩效评估。
 
-## 目录结构
+## 🚀 项目特点
 
-- `data/`  
-  - `fetch_cb_data.py`：可转债日行情数据抓取脚本（基于 akshare）。
-  - `cb_SH_2024.csv`、`cb_SZ_2024.csv`：沪深两市可转债日行情数据。
-  - `generate_conversion_table.py`：拉取沪深两市可转债基础信息，生成转股价映射表 `conversion_price_table.csv`。
-  - `conversion_price_table.csv`：可转债与正股、转股价的标准化映射表，由 `generate_conversion_table.py` 生成。
-- `perf_metrics.py`  
-  量化策略绩效评估函数，包括年化收益、Sharpe/Sortino/Calmar 比率、最大回撤、VaR、CVaR 等常用指标及可视化工具。
-- `CB_Data_Dictionary.txt`  
-  可转债市场基础知识、交易规则、常用字段说明与数据字典。
-- `strategies/`  
-  - `low_premium_strategy.py`：低转股溢价+破净可转债选券策略模块，包含数据读取、mock正股数据、映射表读取与核心选券函数。
-  预留策略开发目录。
-- `framwork/`  
-  预留回测框架目录。
+- **完整回测框架**: 事件驱动架构，支持可转债特有功能（转股、强赎、回售）
+- **数据集成**: 自动处理470只可转债数据（2018-2025年）
+- **专业绩效评估**: 15个关键指标，包含风险调整收益和风险度量
+- **策略开发友好**: 标准化接口，易于开发新策略
+- **报告生成**: 自动生成图表、Excel报告和CSV数据
 
-## 新增功能说明
+## 📁 目录结构
 
-- `data/generate_conversion_table.py`：
-  使用 akshare 拉取沪深两市全部可转债基础信息，生成标准化的转股价映射表 `conversion_price_table.csv`，为策略与数据处理提供基础支撑。
+```
+debts/
+├── framework/                 # 回测框架核心
+│   ├── data_handler.py       # 数据加载和处理
+│   ├── engine.py             # 回测引擎
+│   ├── events.py             # 事件定义
+│   ├── broker.py             # 交易执行
+│   ├── portfolio.py          # 组合管理
+│   └── reporting.py          # 报告生成
+├── strategies/               # 策略目录
+│   └── low_premium_strategy.py  # 低溢价策略示例
+├── data/                     # 数据目录
+│   ├── cb_all.parquet       # 统一的可转债数据
+│   ├── cb_info_full.parquet # 静态信息表
+│   ├── stock_full.parquet   # 正股数据
+│   └── prepare_cb_all.py    # 数据预处理脚本
+├── constants.py              # 全局常量和字段映射
+├── perf_metrics.py           # 绩效评估函数库
+├── run_backtest.py          # 回测运行入口
+└── README.md                # 项目说明
+```
 
-- `strategies/low_premium_strategy.py`：
-  实现低溢价可转债选券策略，包含：
-  - `get_day_data`：读取指定日期的可转债日线数据（合并沪深两市）。
-  - `get_equity_day_data`：mock 版正股日线数据接口，便于后续替换为真实数据。
-  - `load_conversion_table`：读取转股价映射表。
-  - `select_low_premium_cb`：核心选券函数，基于转股溢价和破净因子筛选前N只可转债。
+## 🎯 快速开始
 
-如需使用上述功能，请参考对应脚本内注释与用法说明。
+### 1. 环境准备
+```bash
+pip install pandas numpy matplotlib seaborn
+```
 
-## 依赖环境
+### 2. 数据预处理（首次运行）
+```bash
+python data/prepare_cb_all.py
+```
+
+### 3. 运行回测
+```bash
+python run_backtest.py
+```
+
+### 4. 查看结果
+回测结果将保存在 `output/YYYYMMDD_HHMMSS/` 目录下：
+- `nav_history.csv` - NAV历史数据
+- `perf_metrics.csv` - 绩效指标
+- `report.xlsx` - Excel报告
+- `cumulative_nav.png` - 累计收益曲线
+- `drawdown.png` - 回撤曲线
+
+## 📊 数据概览
+
+- **时间区间**: 2018-09-04 到 2025-07-23
+- **债券数量**: 470只
+- **总记录数**: 344,867条
+- **交易所分布**: 深交所55.7%，上交所44.3%
+
+### 关键字段
+- `cb_code`: 债券代码（如110059.SH）
+- `trade_date`: 交易日期
+- `close`: 收盘价
+- `volume`: 成交量
+- `premium`: 溢价率
+- `convert_price`: 转股价
+- `stk_code`: 对应正股代码
+
+## 🛠️ 策略开发
+
+### 创建新策略
+```python
+# strategies/my_strategy.py
+from framework.events import MarketEvent, SignalEvent
+from typing import List
+
+class MyStrategy:
+    def __init__(self, param1=100, param2=0.5):
+        self.param1 = param1
+        self.param2 = param2
+        self.positions = {}
+    
+    def calculate_signals(self, market_event: MarketEvent) -> List[SignalEvent]:
+        dt = market_event.dt
+        bars = market_event.data
+        signals = []
+        
+        for symbol, bar in bars.items():
+            price = bar["close"]
+            premium = bar.get("premium")
+            
+            # 你的策略逻辑
+            if self.should_buy(price, premium):
+                signals.append(SignalEvent(
+                    dt=dt, symbol=symbol, action="LONG", size=10
+                ))
+        
+        return signals
+```
+
+### 修改回测配置
+```python
+# run_backtest.py
+from strategies.my_strategy import MyStrategy
+
+strategy = MyStrategy(param1=110, param2=0.3)
+```
+
+## 📈 绩效指标
+
+框架提供15个专业绩效指标：
+
+### 收益指标
+- `cumulative_return`: 累积收益率
+- `annual_return`: 年化收益率
+
+### 风险指标
+- `annual_volatility`: 年化波动率
+- `max_drawdown`: 最大回撤
+- `max_drawdown_duration`: 最大回撤持续时间
+
+### 风险调整收益
+- `sharpe_ratio`: 夏普比率
+- `sortino_ratio`: 索提诺比率
+- `calmar_ratio`: 卡玛比率
+- `omega_ratio`: 欧米伽比率
+
+### 风险度量
+- `var_95`: 95%置信度VaR
+- `cvar_95`: 95%置信度CVaR
+- `tail_ratio`: 尾部比率
+
+### 交易统计
+- `win_rate`: 胜率
+- `payoff_ratio`: 盈亏比
+- `profit_factor`: 盈利因子
+
+## 🔧 框架特性
+
+### 事件驱动架构
+- `MarketEvent`: 市场数据事件
+- `SignalEvent`: 策略信号事件
+- `FillEvent`: 成交事件
+- `ConvertEvent`: 转股事件
+
+### 可转债特有功能
+- **转股**: 债券按转股价转换为股票
+- **强赎**: 发行人按约定价格赎回
+- **回售**: 投资者按面值卖回给发行人
+- **交易所差异化费率**: 上交所/深交所不同费率
+
+### 数据标准化
+- 代码格式统一: `110059.SH` / `128044.SZ`
+- 字段映射: 中文↔英文自动转换
+- 数据质量: 100%完整性检查
+
+## 📋 依赖环境
 
 - Python 3.7+
 - pandas
 - numpy
 - matplotlib
 - seaborn
-- akshare
 
-## 快速开始
+## 🤝 贡献
 
-1. 安装依赖：
-   ```bash
-   pip install pandas numpy matplotlib seaborn akshare
-   ```
-2. 抓取可转债数据：
-   ```bash
-   python data/fetch_cb_data.py
-   ```
-   数据将自动保存至 `data/` 目录下。
-3. 使用 `perf_metrics.py` 进行策略绩效分析。
+欢迎提交Issue和Pull Request来改进这个框架！
 
-## 数据说明
+## 📄 许可证
 
-详见 `CB_Data_Dictionary.txt`，包括可转债市场规则、常用字段、数据来源等。
-
-## 可转债日线数据说明
-
-本数据包包含两份已清洗、结构统一的可转债日线数据（沪市 + 深市），适用于量化回测、因子研究、行情分析等多种场景。
-
-### 数据覆盖范围
-- 覆盖全部沪深两市在交易所挂牌的可转债（不含退市标的，若需补全可联系维护人）
-- 时间跨度：约 2019 年至今，随脚本每日自动增量更新
-- 总计约 470–480 只可转债，单市场数据量约 10–20 万行
-
-### 文件列表
-| 文件名              | 内容               | 行数范围         |
-|---------------------|--------------------|-----------------|
-| cb_SH_full.parquet  | 沪市可转债日线数据 | ~10万–20万行    |
-| cb_SZ_full.parquet  | 深市可转债日线数据 | ~10万–20万行    |
-
-### 文件格式
-- 格式：Parquet（二进制高效列式存储，推荐 pyarrow 读取）
-- 编码：UTF-8
-- 压缩：部分文件使用 ZSTD 压缩（`pip install pyarrow` 可自动解压）
-- 读取建议：
-  ```python
-  import pandas as pd
-  df = pd.read_parquet('cb_SH_full.parquet')
-  ```
-
-### 字段说明
-| 字段名   | 类型      | 单位/示例         | 含义                 |
-|----------|-----------|-------------------|----------------------|
-| date     | datetime  | 2024-01-02        | 交易日期（yyyy-mm-dd）|
-| open     | float     | 123.45            | 开盘价（元）         |
-| high     | float     | 125.67            | 最高价（元）         |
-| low      | float     | 120.00            | 最低价（元）         |
-| close    | float     | 124.00            | 收盘价（元）         |
-| volume   | int       | 1000              | 成交量（张）         |
-| symbol   | string    | sh110059          | 债券代码             |
-
-### 使用示例（Python）
-```python
-import pandas as pd
-
-# 读取沪市
-df_sh = pd.read_parquet("cb_SH_full.parquet")
-# 读取深市
-df_sz = pd.read_parquet("cb_SZ_full.parquet")
-
-# 合并为一个 DataFrame（如有需要）
-df_all = pd.concat([df_sh, df_sz], ignore_index=True)
-
-# 按某只可转债取出所有日线
-df_one = df_all[df_all["symbol"] == "sh110059"]
-
-# 按日期区间筛选
-df_period = df_all[(df_all["date"] >= "2023-01-01") & (df_all["date"] <= "2023-12-31")]
-
-# 计算每日收盘均价（横截面均值）
-daily_mean = df_all.groupby("date")["close"].mean()
-```
-
-### 注意事项
-- 数据已标准化，无需额外预处理，字段缺失极少（如遇极端停牌日可自行补全）
-- 每日运行的抓取脚本自动去重和增量更新，无需担心重复数据
-- 数据中不包含退市标的，如需补全请联系维护人
-- 如需对接回测框架，可在 `data_handler.py` 中直接加载以上文件，按 symbol + date 切片并逐日推送
-
----
+MIT License
 
