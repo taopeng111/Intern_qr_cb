@@ -13,8 +13,7 @@ from pathlib import Path
 # ------------------------------------------------------------
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
-PARQ_SH  = DATA_DIR / "cb_SH_full.parquet"
-PARQ_SZ  = DATA_DIR / "cb_SZ_full.parquet"
+PARQ_ALL = DATA_DIR / "cb_all.parquet"
 N_RETRY  = 3                      # 单只债券重试次数
 
 # ------------------------------------------------------------
@@ -30,8 +29,7 @@ codes    = spot_df[code_col].astype(str).tolist()
 def load_parq(path: Path) -> pd.DataFrame:
     return pd.read_parquet(path) if path.exists() and path.stat().st_size else pd.DataFrame()
 
-old_sh, old_sz = load_parq(PARQ_SH), load_parq(PARQ_SZ)
-old_all = pd.concat([old_sh, old_sz], ignore_index=True)      # 可能为空
+old_all = load_parq(PARQ_ALL)
 
 last_date = (
     old_all.groupby("symbol")["date"].max()
@@ -101,12 +99,7 @@ all_data = (
 )
 
 # —— 写入 —— #
-all_data.query("exchange == 'sh'").to_parquet(
-    PARQ_SH, compression="zstd", index=False
-)
-all_data.query("exchange == 'sz'").to_parquet(
-    PARQ_SZ, compression="zstd", index=False
-)
+all_data.to_parquet(PARQ_ALL, compression="zstd", index=False)
 
 print(f"✅  更新完成！总行数：{len(all_data):,} — 上海 {len(all_data.query('exchange=="sh"')):,} / 深圳 {len(all_data.query('exchange=="sz"')):,}")
 

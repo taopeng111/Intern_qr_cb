@@ -40,7 +40,8 @@ df_info = pd.read_parquet(parquet_info, columns=[
     "SECURITY_CODE",
     "CONVERT_STOCK_CODE", 
     "TRANSFER_PRICE",
-    "TRANSFER_PREMIUM_RATIO"
+    "TRANSFER_PREMIUM_RATIO",
+    "ACTUAL_ISSUE_SCALE"  # 添加转债余额数据
 ])
 print(f"   静态表形状: {df_info.shape}")
 
@@ -53,16 +54,25 @@ df_info["stk_code"] = df_info["CONVERT_STOCK_CODE"].apply(
 print(f"   债券代码示例: {df_info['cb_code'].head().tolist()}")
 print(f"   正股代码示例: {df_info['stk_code'].head().tolist()}")
 
-# 6) 准备合并数据 - 避免重复列名
+# 6) 准备合并数据
 print("🔗 准备合并数据...")
 # 从静态表中选择需要的列，并重命名
-df_info_for_merge = df_info[["cb_code", "stk_code", "TRANSFER_PRICE", "TRANSFER_PREMIUM_RATIO"]].copy()
+df_info_for_merge = df_info[["cb_code", "stk_code", "TRANSFER_PRICE", "TRANSFER_PREMIUM_RATIO", "ACTUAL_ISSUE_SCALE"]].copy()
 df_info_for_merge = df_info_for_merge.rename(columns={
     "TRANSFER_PRICE": "convert_price",
     "TRANSFER_PREMIUM_RATIO": "premium",
+    "ACTUAL_ISSUE_SCALE": "balance",  # 转债余额（亿元）
 })
 
-# 7) 合并数据
+# 7) 清理日线数据中的重复列
+print("🧹 清理重复列...")
+columns_to_drop = ['stk_code', 'convert_price', 'premium']
+for col in columns_to_drop:
+    if col in df_cb.columns:
+        df_cb = df_cb.drop(columns=[col])
+        print(f"   删除了重复列: {col}")
+
+# 8) 合并数据
 print("🔗 合并日线和静态数据...")
 df_merged = df_cb.merge(
     df_info_for_merge,
@@ -73,25 +83,31 @@ df_merged = df_cb.merge(
 print(f"   合并后形状: {df_merged.shape}")
 print(f"   最终列名: {df_merged.columns.tolist()}")
 
-# 8) 检查关键字段
-required_fields = ["cb_code", "trade_date", "close", "volume"]
+# 9) 检查关键字段
+required_fields = ["cb_code", "trade_date", "close", "volume", "premium", "balance"]
 missing_fields = [field for field in required_fields if field not in df_merged.columns]
 if missing_fields:
     print(f"❌ 缺少关键字段: {missing_fields}")
 else:
     print("✅ 所有关键字段都存在")
 
-# 9) 保存结果
+# 10) 保存结果
 print("💾 保存处理后的数据...")
 df_merged.to_parquet(parquet_cb, index=False)
 print(f"✔ 已保存到: {parquet_cb}")
 
-# 10) 验证结果
+# 11) 验证结果
 print("🔍 验证数据格式...")
 df_check = pd.read_parquet(parquet_cb)
 print(f"   验证 - 形状: {df_check.shape}")
 print(f"   验证 - 债券代码格式: {df_check['cb_code'].str.contains(r'\.\w{2}$').all()}")
 print(f"   验证 - 样本数据:")
-print(df_check[["cb_code", "trade_date", "close", "premium"]].head())
+print(df_check[["cb_code", "trade_date", "close", "premium", "balance"]].head())
+
+# 12) 检查余额数据
+print("📊 余额数据统计:")
+balance_stats = df_check['balance'].describe()
+print(balance_stats)
+print(f"   非空余额数据数量: {df_check['balance'].notna().sum()}")
 
 print("🎉 数据处理完成!") 

@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict
+from datetime import time
 
 import pandas as pd
 
@@ -36,6 +37,19 @@ FIELD_MAP_CN2EN: Dict[str, str] = {
     "CONVERT_STOCK_CODE": "stk_code",
     "TRANSFER_PRICE": "convert_price",
     "TRANSFER_PREMIUM_RATIO": "premium",
+    # 正股数据中文列名映射
+    "日期": "trade_date",
+    "股票代码": "stk_code",
+    "开盘": "open",
+    "收盘": "close",
+    "最高": "high",
+    "最低": "low",
+    "成交量": "volume",
+    "成交额": "amount",
+    "振幅": "amplitude",
+    "涨跌幅": "pct_change",
+    "涨跌额": "price_change",
+    "换手率": "turnover_rate",
     # …（按需添加）
 }
 
@@ -108,13 +122,50 @@ EXCHANGE_RULES: Dict[str, dict] = {
 }
 
 # 2.2 税费（全国统一）
-STAMP_DUTY_STOCK_SELL: float = 0.001       # 股票卖出印花税 0.1%
+STAMP_DUTY_STOCK_SELL: float = 0.0005      # 股票卖出印花税 0.05%
 
 # 2.3 制度阈值
 FORCE_REDEEM_TRIGGER: float = 1.30         # 强赎触发价 ≥130% 面值
 FORCE_REDEEM_DAYS: int = 30                # 连续 n 个交易日
 PUT_TRIGGER: float = 0.70                  # 回售触发价 ≤70% 面值
 PUT_DAYS: int = 30
+
+# 2.5 债券现金流参数
+DEFAULT_COUPON_RATE: float = 0.02          # 默认票面利率 2%
+DEFAULT_MATURITY_YEARS: int = 6            # 默认到期年限 6年
+DEFAULT_REDEEM_PRICE: float = 100.0        # 默认赎回价（面值）
+DEFAULT_PUT_PRICE: float = 100.0           # 默认回售价（面值）
+
+# 2.4 流动性约束参数
+MAX_PCT_VOL = 0.15         # 单笔不超过当日成交量 15%
+IMPACT_COEFF = 0.0005      # 冲击成本系数
+
+# —— 价格限制与步长 —— #
+TICK_SIZE = 0.01                              # 整股/整张报价最小变动
+
+# 板块 → 日涨跌幅上限（%）
+PRICE_LIMIT_PCT = {
+    "MAIN": 0.10,     # 沪深主板
+    "STAR": 0.20,     # 科创板（688xxx）
+    "CHINEXT": 0.20,  # 创业板（3xxxxx / 30xxxx）
+    "BE": 0.30,       # 北交所（8xxxxx）
+    "CB": 0.20,       # 可转债（11/12xxxxx）
+}
+
+def round_to_tick(price: float, tick_size: float = TICK_SIZE) -> float:
+    """
+    按 tick_size 四舍五入到最近的价格（round half up）
+    例如：round_to_tick(100.005) = 100.01
+    """
+    # 使用 math.floor 实现 round half up
+    import math
+    return math.floor(price / tick_size + 0.5) * tick_size
+
+# --------- 竞价时段 ---------
+OPEN_AUC_START  = time(9, 15)
+OPEN_AUC_END    = time(9, 25)
+CLOSE_AUC_START = time(14, 57)
+CLOSE_AUC_END   = time(15, 0)      # 上交所转债 15:00 截止
 
 # ------------------------------------------------------------------
 # 3. Config ：可运行默认参数（env 可覆盖）
@@ -125,7 +176,7 @@ class Config:
     LOT_SIZE: int = 10
     DEFAULT_SLIPPAGE_BPS: int = 2          # 买 +2bps / 卖 −2bps
     COMMISSION_RATE: float = 0.0001
-    MIN_COMMISSION: float = 1.0
+    MIN_COMMISSION: float = 5.0
     TRADING_CALENDAR: List[str] = None     # 自动加载后赋值
 
     @classmethod

@@ -175,7 +175,151 @@ strategy = MyStrategy(param1=110, param2=0.3)
 
 欢迎提交Issue和Pull Request来改进这个框架！
 
+## 🕐 分钟级回测功能
+
+### 新增功能
+- **双事件循环**: 外层读取分钟Bar，内层15秒或1秒触发ClockEvent
+- **模块解耦**: DataHandler.update_bars() 返回list，一次可能推多条MarketEvent
+- **实时估值**: Portfolio估值频率可保持日终，也可分钟级实时滚动
+- **时钟事件**: 支持定时触发策略检查、风险控制等
+
+### 分钟级数据处理器
+```python
+from framework.data_handler import DataHandlerMinute
+
+# 初始化分钟级数据处理器
+data_handler = DataHandlerMinute(
+    cb_minute_path="data/cb_minute.parquet",
+    stk_minute_path="data/stock_minute.parquet",
+    cb_info_path="data/cb_info_full.parquet",
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    clock_interval=15,  # 15秒时钟事件
+)
+```
+
+### 运行分钟级回测
+```bash
+# 使用模拟数据测试
+python test_minute_backtest.py
+
+# 使用真实分钟数据
+python run_minute_backtest.py
+```
+
+### 时钟事件处理
+```python
+from framework.events import ClockEvent
+
+# 在策略中处理时钟事件
+def _process_clock(self, clock_event: ClockEvent) -> None:
+    # 定时检查、风险控制等
+    pass
+```
+
+### 分钟级 vs 日线级对比
+- **波动率**: 分钟级更贴近真实市场波动
+- **下单价**: 分钟级提供更精确的成交价格
+- **方向一致性**: 整体策略方向与日线版本一致
+- **性能**: 分钟级回测计算量更大，但提供更精细的结果
+
+## 📈 性能指标
+
+### 基础指标
+- **总收益率**: 整个回测期间的总收益
+- **年化收益率**: 年化后的收益率
+- **最大回撤**: 最大亏损幅度
+- **夏普比率**: 风险调整后收益
+- **波动率**: 收益率的波动程度
+
+### 高级指标
+- **卡玛比率**: 最大回撤调整后收益
+- **索提诺比率**: 下行风险调整后收益
+- **VaR**: 风险价值
+- **CVaR**: 条件风险价值
+- **胜率**: 盈利交易占比
+
+## 🔧 配置说明
+
+### 流动性约束参数
+```python
+# constants.py
+PRICE_LIMIT_CB = 0.20      # 可转债涨跌幅限制 20%
+PRICE_LIMIT_STK = 0.10     # 股票涨跌幅限制 10%
+MAX_PCT_VOL = 0.15         # 单笔不超过当日成交量 15%
+IMPACT_COEFF = 0.0005      # 冲击成本系数
+```
+
+### 债券现金流参数
+```python
+DEFAULT_COUPON_RATE = 0.02     # 默认票面利率 2%
+DEFAULT_MATURITY_YEARS = 6     # 默认到期年限 6年
+DEFAULT_REDEEM_PRICE = 100.0   # 默认赎回价（面值）
+DEFAULT_PUT_PRICE = 100.0      # 默认回售价（面值）
+```
+
+## 🐛 故障排除
+
+### 常见问题
+1. **数据文件不存在**: 检查 `data/` 目录下的parquet文件
+2. **内存不足**: 减少回测时间范围或债券数量
+3. **性能指标计算错误**: 检查净值数据是否连续
+
+### 调试模式
+```python
+# 启用详细日志
+logging.basicConfig(level=logging.DEBUG)
+
+# 在数据处理器中启用调试
+data_handler = DailyBarDataHandler(..., log_level=logging.DEBUG)
+```
+
+## 📝 更新日志
+
+### v0.4 (最新)
+- ✅ 新增分钟级回测功能
+- ✅ 实现双事件循环架构
+- ✅ 添加时钟事件支持
+- ✅ 支持分钟级实时估值
+
+### v0.3
+- ✅ 实现债券现金流功能（利息、强赎、回售、到期兑付）
+- ✅ 添加流动性约束（涨跌停、成交量限制、冲击成本）
+- ✅ 完善事件驱动架构
+
+### v0.2
+- ✅ 修复股票持仓估值更新问题
+- ✅ 优化数据处理器性能
+- ✅ 增强错误处理
+
+### v0.1
+- ✅ 基础回测框架
+- ✅ 三低策略实现
+- ✅ 绩效评估系统
+
+## 🤝 贡献指南
+
+欢迎提交Issue和Pull Request！
+
+### 开发环境
+```bash
+git clone <repository>
+cd debts
+pip install -r requirements.txt
+```
+
+### 代码规范
+- 使用类型注解
+- 添加文档字符串
+- 遵循PEP 8规范
+- 编写单元测试
+
 ## 📄 许可证
 
 MIT License
+
+## 📞 联系方式
+
+如有问题，请提交Issue或联系维护者。
+
 

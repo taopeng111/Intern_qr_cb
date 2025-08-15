@@ -1,0 +1,30 @@
+{
+  "max_positions": 200,
+  "lots_per_trade": 1,
+  "rotation": "weekly",
+  "rotation_day": 0,
+  "min_price": 90.0,
+  "max_price": 140.0,
+  "min_balance_billion": 2.0,
+  "max_realized_vol_20d": 60.0,
+  "premium_bounds": [
+    -10.0,
+    50.0
+  ],
+  "extreme_price_premium_gate": [
+    150.0,
+    60.0
+  ],
+  "blacklist": [],
+  "take_profit": 125.0,
+  "stop_loss": 90.0,
+  "momentum_mode": "trend",
+  "momentum_lookback": 60,
+  "hist_percentile_lookback": 252,
+  "iv_window": 20,
+  "w_dual_low": 0.35,
+  "w_hist_pct": 0.2,
+  "w_low_iv": 0.2,
+  "w_momentum": 0.2,
+  "w_balance": 0.05
+}
