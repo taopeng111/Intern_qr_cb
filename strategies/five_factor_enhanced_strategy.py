@@ -40,29 +40,30 @@ from constants import normalise_cb_code
 @dataclass
 class StrategyConfig:
     # 基础与容量
-    max_positions: int = 200              # 最大持仓数（容量友好）
-    lots_per_trade: int = 1               # 每次下单“手数”（1 手 = 10 张）
+    max_positions: int = 100              # 最大持仓数（容量友好）
+    lots_per_trade: int = 10              # 每次下单"手数"（1 手 = 10 张）
 
     # 调仓节奏
     rotation: str = "weekly"              # daily / weekly / monthly
-    rotation_day: int = 0                 # weekly: 0=周一；monthly: 日号
+    rotation_day_weekly: int = 4          # weekly: 0=周一,1=周二,2=周三,3=周四,4=周五
+    rotation_day_monthly: int = 15         # monthly: 日号
 
     # 雷禁过滤（硬过滤）
-    min_price: float = 90.0               # 收盘价下限
+    min_price: float = 70.0               # 收盘价下限
     max_price: float = 140.0              # 收盘价上限（过高价容易不稳）
-    min_balance_billion: float = 2.0      # 转债余额下限（亿元），缓解流动性
+    min_balance_billion: float = 3.0      # 转债余额下限（亿元），缓解流动性
     max_realized_vol_20d: float = 60.0    # 20日历史波动率上限（%年化近似）
-    premium_bounds: Tuple[float, float] = (-10.0, 50.0)  # 溢价率区间（%）
-    extreme_price_premium_gate: Tuple[float, float] = (150.0, 60.0)  # 价>150且溢价>60 剔除
+    premium_bounds: Tuple[float, float] = (-2.5, 52.5)  # 溢价率区间（%）
+    extreme_price_premium_gate: Tuple[float, float] = (145.0, 60.0)  # 价>145且溢价>60 剔除
     blacklist: List[str] = None
 
     # 止盈/止损
-    take_profit: float = 125.0            # 价格止盈
-    stop_loss: float = 90.0               # 价格止损
+    take_profit: float = 135.0            # 价格止盈
+    stop_loss: float = 80.0               # 价格止损
 
     # 动量参数
-    momentum_mode: str = "trend"          # 'trend' or 'reversal'
-    momentum_lookback: int = 60           # 动量窗口（交易日）
+    momentum_mode: str = "reversal"       # 'trend' or 'reversal'
+    momentum_lookback: int = 120          # 动量窗口（交易日）
 
     # 历史分位参数
     hist_percentile_lookback: int = 252   # 历史分位回溯窗口
@@ -71,11 +72,13 @@ class StrategyConfig:
     iv_window: int = 20                   # 波动率窗口（交易日）
 
     # 因子权重（和为1较好，但不强制）
-    w_dual_low: float = 0.35
-    w_hist_pct: float = 0.20
-    w_low_iv: float   = 0.20
-    w_momentum: float = 0.20
-    w_balance: float  = 0.05              # 若无 balance 列则自动归零
+    w_dual_low: float = 0.0042
+    w_hist_pct: float = 0.8488
+    w_low_iv: float   = 0.1132
+    w_momentum: float = 0.0331
+    w_balance: float  = 0.0007              # 若无 balance 列则自动归零
+    
+
 
     def __post_init__(self) -> None:
         if self.blacklist is None:
@@ -115,7 +118,13 @@ class DualLowFiveFactorStrategy:
     def _get_daily_snapshot(self, date_str: str) -> pd.DataFrame:
         if self.cb_data.empty:
             return pd.DataFrame()
-        dt = pd.to_datetime(date_str)
+        
+        # Handle both string and datetime inputs
+        if isinstance(date_str, str):
+            dt = pd.to_datetime(date_str)
+        else:
+            dt = date_str
+            
         daily = self.cb_data[self.cb_data["trade_date"].dt.normalize() == dt.normalize()].copy()
         return daily
 
@@ -125,7 +134,13 @@ class DualLowFiveFactorStrategy:
             return self.data_cache[cache_key]
         if self.cb_data.empty:
             return pd.DataFrame()
-        end_dt = pd.to_datetime(end_date)
+            
+        # Handle both string and datetime inputs
+        if isinstance(end_date, str):
+            end_dt = pd.to_datetime(end_date)
+        else:
+            end_dt = end_date
+            
         hist = self.cb_data[self.cb_data["cb_code"] == symbol]
         if hist.empty:
             return pd.DataFrame()
@@ -142,13 +157,19 @@ class DualLowFiveFactorStrategy:
         if self.last_rotation_date == current_date:
             return False
         rotation = self.config.rotation.lower()
-        dt = pd.to_datetime(current_date)
+        
+        # Handle both string and datetime inputs
+        if isinstance(current_date, str):
+            dt = pd.to_datetime(current_date)
+        else:
+            dt = current_date
+            
         if rotation == "daily":
             return True
         if rotation == "weekly":
-            return dt.weekday() == self.config.rotation_day
+            return dt.weekday() == self.config.rotation_day_weekly
         if rotation == "monthly":
-            return dt.day == max(1, int(self.config.rotation_day))
+            return dt.day == max(1, int(self.config.rotation_day_monthly))
         return False
 
     # ------------------------------
@@ -162,10 +183,10 @@ class DualLowFiveFactorStrategy:
 
         # 基础价格与溢价区间
         lo_prem, hi_prem = cfg.premium_bounds
-        mask = (
-            (df["close"].between(cfg.min_price, cfg.max_price, inclusive="both")) &
-            (df["premium"].between(lo_prem, hi_prem, inclusive="both"))
-        )
+        price_mask = df["close"].between(cfg.min_price, cfg.max_price, inclusive="both")
+        premium_mask = df["premium"].between(lo_prem, hi_prem, inclusive="both")
+        
+        mask = price_mask & premium_mask
 
         # 余额阈值（若有该列）
         if "balance" in df.columns:
@@ -347,7 +368,7 @@ class DualLowFiveFactorStrategy:
         dt = market_event.dt
         date_str = dt.strftime("%Y%m%d")
 
-        if not self._should_rotate(date_str):
+        if not self._should_rotate(dt):  # Pass the datetime object directly
             # 非轮动日也打印心跳，便于观察
             if not hasattr(self, "_heartbeat"):
                 self._heartbeat = 0

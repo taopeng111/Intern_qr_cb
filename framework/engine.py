@@ -93,70 +93,80 @@ class BacktestEngine:
     # ----- 主循环 -----
     def run(self) -> None:
         self.logger.info("Backtest started.")
-        i = 0
         t0 = time.time()
+        
+        # （若有）重置数据处理器内部游标
+        if hasattr(self.data_handler, "reset"):
+            self.data_handler.reset()
+        
         try:
-            while self.data_handler.continue_backtest or self.events:
-                # 1) 推送最新 MarketEvent
-                if self.data_handler.continue_backtest:
-                    events_data = self.data_handler.update_bars()
-                    
-                    # 支持分钟级数据处理器返回多个事件
-                    if isinstance(events_data, list):
-                        # 分钟级：处理多个事件（MarketEvent + ClockEvent）
-                        for event_data in events_data:
-                            if event_data["type"] == "market":
-                                # 把最新行情缓存给 broker
-                                self.broker.update_market(
-                                    bars=event_data["bars"],
-                                    session=event_data["session"],      # ★ 新增
-                                )
-                                
-                                market_event = MarketEvent(
-                                    dt=event_data["timestamp"],
-                                    data=event_data["bars"],
-                                )
-                                self.events.append(market_event)
-                                
-                                # 处理现金流事件
-                                cash_events = event_data.get("cash_events", [])
-                                force_redeem_put_events = event_data.get("force_redeem_put_events", [])
-                                
-                                for cash_event in cash_events:
-                                    self.events.append(cash_event)
-                                for force_redeem_put_event in force_redeem_put_events:
-                                    self.events.append(force_redeem_put_event)
-                                    
-                            elif event_data["type"] == "clock":
-                                # 时钟事件
-                                clock_event = ClockEvent(
-                                    dt=event_data["timestamp"],
-                                    interval_seconds=15
-                                )
-                                self.events.append(clock_event)
-                    else:
-                        # 日线级：原有逻辑
-                        bar_data = self.data_handler.get_latest_bars()
+            while True:
+                # 1) 先推进一根bar
+                if hasattr(self.data_handler, "continue_backtest") and not self.data_handler.continue_backtest:
+                    break
+                self.data_handler.update_bars()  # ★ 关键：先推进
 
-                        # ★ 把最新行情缓存给 broker（新增）
-                        self.broker.update_market(bar_data["bars"])
+                # 2) 再取"当前"bar数据（日期 + 当日字典/表）
+                try:
+                    bar_data = self.data_handler.get_latest_bars()
+                    dt, bars = bar_data["timestamp"], bar_data["bars"]
+                except (StopIteration, RuntimeError) as e:
+                    # 如果没有更多数据或出现错误，退出循环
+                    if "Call update_bars() before get_latest_bars()" in str(e):
+                        # 如果是因为顺序问题，继续下一次迭代
+                        continue
+                    break
 
-                        market_event = MarketEvent(
-                            dt=bar_data["timestamp"],
-                            data=bar_data["bars"],
-                        )
-                        self.events.append(market_event)
-                        # 进度日志：每天打印一次日期和可交易标的数
-                        self.logger.info(
-                            "Market %s — instruments: %d",
-                            str(bar_data["timestamp"].date()),
-                            len(bar_data["bars"]),
-                        )
+                # 3) 播行情给券商 + 转发现金/强赎/回售事件到组合
+                session = getattr(bar_data, "get", lambda k, d=None: d)("session", "continuous") if isinstance(bar_data, dict) else "continuous"
+                if hasattr(self.broker, "update_market"):
+                    self.broker.update_market(bars, session=session)  # ★ 把当日行情播给券商（撮合要用） 
 
-                # 2) 处理队列事件
+                # 转发现金/强赎/回售事件到组合（若 data_handler 当天产出了这些）
+                for evt in (bar_data.get("cash_events") or []):
+                    self.portfolio.update_from_cash([evt])
+                for evt in (bar_data.get("force_redeem_put_events") or []):
+                    if evt.type.name == "FORCE_REDEEM":
+                        self.portfolio.update_from_force_redeem([evt])
+                    elif evt.type.name == "PUT":
+                        self.portfolio.update_from_put([evt])
+
+                # 4) 把当日bar字典塞进MarketEvent给策略
+                me = MarketEvent(dt=dt, data=bars)  # ★ 直接传data参数
+
+                # 4) 让策略产出信号
+                signals = self.strategy.calculate_signals(me)
+
+                # 5) 生成委托并在"次日开盘"执行
+                next_info = getattr(self.data_handler, "peek_next_bars", None)
+                if callable(next_info):
+                    try:
+                        next_dt, next_bars = next_info()
+                    except:
+                        next_dt, next_bars = dt, bars  # 没有peek就用当日
+                else:
+                    next_dt, next_bars = dt, bars  # 没有peek就用当日
+
+                # 执行信号
+                for signal in signals:
+                    self.events.append(signal)
+
+                # 6) 处理队列事件
                 while self.events:
                     event = self.events.popleft()
                     self._handle_event(event)
+
+                # 7) 组合记账 & 记录净值
+                self.portfolio.mark_to_market(dt, bars)
+                if hasattr(self.reporter, "collect_nav"):
+                    self.reporter.collect_nav(dt, self.portfolio.current_nav())
+                
+                # 进度日志：每天打印一次日期和可交易标的数
+                self.logger.info(
+                    "Market %s — instruments: %d",
+                    str(dt.date()),
+                    len(bars),
+                )
 
         finally:
             # 3) 输出报告
@@ -205,7 +215,12 @@ class BacktestEngine:
 
     # ----- 策略调用 -----
     def _process_market(self, market_event: MarketEvent) -> None:
+        # 添加调试信息
+        print(f"DEBUG: 处理市场事件 {market_event.dt.date()}, 数据条数: {len(market_event.data) if hasattr(market_event, 'data') else 'N/A'}")
+        
         signals = self.strategy.calculate_signals(market_event)
+        print(f"DEBUG: 策略生成信号数量: {len(signals)}")
+        
         for sig in signals:
             self.events.append(sig)
 

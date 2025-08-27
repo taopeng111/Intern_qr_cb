@@ -1,0 +1,30 @@
+{
+    "top_n": 5,
+    "rebalance": "weekly",
+    "rebalance_weekday": 4,
+    "min_hold_days": 3,
+    "trend_in": 30.0,
+    "trend_out": 30.0,
+    "price_min": 90.0,
+    "price_max": 160.0,
+    "premium_min": 0.0,
+    "premium_max": 80.0,
+    "term_min_years": 0.5,
+    "turnover_min": 0.0,
+    "exclude_new_days": 1,
+    "blacklist": [],
+    "factor_weights": {
+      "neg_premium": 1.0,
+      "neg_price_pct_rank": 1.0,
+      "neg_ytm": 0.5,
+      "neg_vol20": 0.5,
+      "liq_rank": 0.5,
+      "neg_term": 0.2
+    },
+    "lot_size": 10,
+    "target_gross_exposure": 1.0,
+    "execution": "next_open",
+    "commission_rate": 0.0003,
+    "slippage": 0.001
+  }
+  

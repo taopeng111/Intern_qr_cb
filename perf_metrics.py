@@ -146,25 +146,39 @@ def sortino_ratio(
 
     return float((mean_excess / std_downside) * np.sqrt(periods_per_year))
 
-def max_drawdown(returns: ArrayLike) -> float:
+def max_drawdown(returns_or_nav: ArrayLike, is_nav: bool = False) -> float:
     """
     计算最大回撤。
     
     参数：
-    - returns: 单期收益率序列 (array-like)
+    - returns_or_nav: 单期收益率序列或净值曲线 (array-like)
+    - is_nav: 如果为True，输入被视为净值曲线；如果为False，视为收益率序列
     
     返回：
     - 最大回撤（float）
     """
-    returns = daily_return(returns)
-    
-    if len(returns) == 0:
-        return np.nan
+    if is_nav:
+        # 直接使用净值曲线计算
+        nav_values = np.asarray(returns_or_nav)
+        nav_values = nav_values[~np.isnan(nav_values)]
+        
+        if len(nav_values) == 0:
+            return np.nan
+            
+        running_max = np.maximum.accumulate(nav_values)
+        drawdowns = nav_values / running_max - 1.0
+        return float(drawdowns.min())
+    else:
+        # 原有逻辑：从收益率序列计算
+        returns = daily_return(returns_or_nav)
+        
+        if len(returns) == 0:
+            return np.nan
 
-    cum_nav = cum_return(returns)    # 资金净值
-    running_max = np.maximum.accumulate(cum_nav)    
-    drawdowns = cum_nav / running_max - 1.0
-    return float(drawdowns.min())
+        cum_nav = cum_return(returns)    # 资金净值
+        running_max = np.maximum.accumulate(cum_nav)    
+        drawdowns = cum_nav / running_max - 1.0
+        return float(drawdowns.min())
 
 def max_drawdown_duration(returns: ArrayLike) -> int:
     """
