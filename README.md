@@ -1,190 +1,190 @@
-# 可转债量化回测框架
+# Convertible Bond Quantitative Backtesting Framework
 
-## 项目概述
+## Project Overview
 
-这是一个专门针对中国可转债市场的量化投资回测框架，集成了多种投资策略、完整的回测引擎和性能分析工具。项目旨在为量化投资者提供一个完整的可转债策略研究、回测和优化平台。
+This is a quantitative investment backtesting framework specifically designed for the Chinese convertible bond market, integrating multiple investment strategies, a complete backtesting engine, and performance analysis tools. The project aims to provide quantitative investors with a comprehensive platform for convertible bond strategy research, backtesting, and optimization.
 
-## 核心特性
+## Core Features
 
-- **多策略支持**: 包含三低策略、五因子增强策略、双阶段策略等多种可转债投资策略
-- **完整回测框架**: 事件驱动的回测引擎，支持真实交易成本、滑点、涨跌停等市场约束
-- **数据管理**: 自动数据获取、预处理和标准化，支持增量更新
-- **策略优化**: 基于Optuna的超参数优化，支持多目标优化
-- **性能分析**: 全面的风险收益指标计算和可视化
+- **Multi-Strategy Support**: Includes three-low strategy, five-factor enhanced strategy, two-stage strategy, and other convertible bond investment strategies
+- **Complete Backtesting Framework**: Event-driven backtesting engine supporting real trading costs, slippage, price limits, and other market constraints
+- **Data Management**: Automatic data acquisition, preprocessing, and standardization with incremental updates
+- **Strategy Optimization**: Optuna-based hyperparameter optimization supporting multi-objective optimization
+- **Performance Analysis**: Comprehensive risk-return metrics calculation and visualization
 
-## 项目结构
+## Project Structure
 
 ```
 debts/
-├── constants.py                    # 全局常量和配置
-├── CB_Data_Dictionary.txt         # 可转债数据字典和交易规则
-├── data/                          # 数据相关模块
-│   ├── fetch_cb_data.py          # 可转债数据获取
-│   ├── get_bond_info.py          # 债券信息获取
-│   ├── prepare_cb_all.py         # 数据预处理
-│   └── strategy_config.json      # 策略配置
-├── framework/                     # 回测框架核心
+├── constants.py                    # Global constants and configuration
+├── CB_Data_Dictionary.txt         # Convertible bond data dictionary and trading rules
+├── data/                          # Data-related modules
+│   ├── fetch_cb_data.py          # Convertible bond data acquisition
+│   ├── get_bond_info.py          # Bond information acquisition
+│   ├── prepare_cb_all.py         # Data preprocessing
+│   └── strategy_config.json      # Strategy configuration
+├── framework/                     # Backtesting framework core
 │   ├── __init__.py
-│   ├── engine.py                 # 回测主引擎
-│   ├── data_handler.py           # 数据处理器
-│   ├── broker.py                 # 交易执行器
-│   ├── portfolio.py              # 投资组合管理
-│   ├── events.py                 # 事件系统
-│   └── reporting.py              # 报告生成
-├── strategies/                    # 投资策略
-│   ├── three_low_strategy.py     # 三低策略
-│   ├── five_factor_enhanced_strategy.py  # 五因子增强策略
-│   ├── two_stage_enhanced_strategy.py    # 双阶段策略
-│   ├── optuna_tune.py            # 策略优化
-│   └── quick_weight_test.py      # 权重测试
-├── run_*.py                      # 各种回测运行脚本
-├── portfolio_backtest.py         # 投资组合回测框架
-├── perf_metrics.py               # 性能指标计算
-└── optuna_factor_weights.py      # 因子权重优化
+│   ├── engine.py                 # Main backtesting engine
+│   ├── data_handler.py           # Data processor
+│   ├── broker.py                 # Trading executor
+│   ├── portfolio.py              # Portfolio management
+│   ├── events.py                 # Event system
+│   └── reporting.py              # Report generation
+├── strategies/                    # Investment strategies
+│   ├── three_low_strategy.py     # Three-low strategy
+│   ├── five_factor_enhanced_strategy.py  # Five-factor enhanced strategy
+│   ├── two_stage_enhanced_strategy.py    # Two-stage strategy
+│   ├── optuna_tune.py            # Strategy optimization
+│   └── quick_weight_test.py      # Weight testing
+├── run_*.py                      # Various backtesting run scripts
+├── portfolio_backtest.py         # Portfolio backtesting framework
+├── perf_metrics.py               # Performance metrics calculation
+└── optuna_factor_weights.py      # Factor weight optimization
 ```
 
-## 主要策略
+## Main Strategies
 
-### 1. 三低策略 (Three Low Strategy)
-- **核心逻辑**: 选择价格低、溢价率低、余额低的可转债
-- **筛选条件**: 价格90-110元，溢价率-10%到20%，余额0.8-10亿元
-- **轮动频率**: 周度轮动
-- **风控**: 止盈125元，止损95元
+### 1. Three-Low Strategy
+- **Core Logic**: Select convertible bonds with low price, low premium ratio, and low balance
+- **Screening Criteria**: Price 90-110 yuan, premium ratio -10% to 20%, balance 0.8-10 billion yuan
+- **Rotation Frequency**: Weekly rotation
+- **Risk Control**: Take profit at 125 yuan, stop loss at 95 yuan
 
-### 2. 五因子增强策略 (Five Factor Enhanced Strategy)
-- **因子构成**:
-  - 双低值 (价格 + 100×溢价率)
-  - 历史分位数
-  - 隐含波动率代理
-  - 价格动量
-  - 转债余额
-- **优化目标**: 通过Optuna优化因子权重
-- **容量**: 支持最多160只转债持仓
+### 2. Five-Factor Enhanced Strategy
+- **Factor Composition**:
+  - Dual-low value (price + 100×premium ratio)
+  - Historical percentile
+  - Implied volatility proxy
+  - Price momentum
+  - Convertible bond balance
+- **Optimization Target**: Optimize factor weights through Optuna
+- **Capacity**: Support up to 160 convertible bond positions
 
-### 3. 双阶段策略 (Two Stage Strategy)
-- **第一阶段**: 基于多因子综合评分的选股
-- **第二阶段**: 基于趋势强度的择时
-- **执行**: 周度调仓，最小持仓5天
+### 3. Two-Stage Strategy
+- **Stage 1**: Stock selection based on multi-factor comprehensive scoring
+- **Stage 2**: Timing based on trend strength
+- **Execution**: Weekly rebalancing with minimum 5-day holding period
 
-## 回测框架
+## Backtesting Framework
 
-### 核心组件
-- **DataHandler**: 处理可转债和正股数据，支持日频数据
-- **Strategy**: 策略逻辑实现，生成买卖信号
-- **Broker**: 模拟交易执行，包含滑点、手续费等成本
-- **Portfolio**: 投资组合管理，计算净值变化
-- **Engine**: 事件驱动的主循环，协调各组件
+### Core Components
+- **DataHandler**: Process convertible bond and underlying stock data, support daily frequency data
+- **Strategy**: Strategy logic implementation, generate buy/sell signals
+- **Broker**: Simulate trade execution, include slippage, commission, and other costs
+- **Portfolio**: Portfolio management, calculate NAV changes
+- **Engine**: Event-driven main loop, coordinate all components
 
-### 事件系统
-- **MarketEvent**: 市场数据更新事件
-- **SignalEvent**: 策略生成的交易信号
-- **OrderEvent**: 订单事件
-- **FillEvent**: 成交事件
-- **CashEvent**: 现金事件（分红、利息等）
+### Event System
+- **MarketEvent**: Market data update events
+- **SignalEvent**: Trading signals generated by strategy
+- **OrderEvent**: Order events
+- **FillEvent**: Fill events
+- **CashEvent**: Cash events (dividends, interest, etc.)
 
-## 数据管理
+## Data Management
 
-### 数据源
-- **可转债数据**: 通过akshare获取日线行情
-- **债券信息**: 包含转股价、溢价率、余额等静态信息
-- **正股数据**: 支持对冲和相关性分析
+### Data Sources
+- **Convertible Bond Data**: Daily market data through akshare
+- **Bond Information**: Include conversion price, premium ratio, balance, and other static information
+- **Underlying Stock Data**: Support hedging and correlation analysis
 
-### 数据格式
-- 支持Parquet格式，提高读写效率
-- 自动标准化代码格式（如110059.SH, 128044.SZ）
-- 增量更新，避免重复下载
+### Data Format
+- Support Parquet format for improved read/write efficiency
+- Automatic code format standardization (e.g., 110059.SH, 128044.SZ)
+- Incremental updates to avoid duplicate downloads
 
-## 性能分析
+## Performance Analysis
 
-### 核心指标
-- **收益指标**: 年化收益率、累积收益
-- **风险指标**: 年化波动率、最大回撤、VaR、CVaR
-- **风险调整收益**: Sharpe比率、Sortino比率、Calmar比率
-- **交易统计**: 胜率、盈亏比、Profit Factor
+### Core Metrics
+- **Return Metrics**: Annualized return, cumulative return
+- **Risk Metrics**: Annualized volatility, maximum drawdown, VaR, CVaR
+- **Risk-Adjusted Returns**: Sharpe ratio, Sortino ratio, Calmar ratio
+- **Trading Statistics**: Win rate, profit/loss ratio, Profit Factor
 
-### 可视化
-- 净值曲线图
-- 回撤分析图
-- 收益分布图
-- 相关性热力图
+### Visualization
+- NAV curve charts
+- Drawdown analysis charts
+- Return distribution charts
+- Correlation heatmaps
 
-## 使用方法
+## Usage Instructions
 
-### 1. 环境准备
+### 1. Environment Setup
 ```bash
 pip install pandas numpy matplotlib seaborn optuna akshare
 ```
 
-### 2. 数据获取
+### 2. Data Acquisition
 ```bash
 cd data
 python fetch_cb_data.py
 python prepare_cb_all.py
 ```
 
-### 3. 运行回测
+### 3. Run Backtesting
 ```bash
-# 三低策略回测
+# Three-low strategy backtesting
 python run_three_low_backtest.py
 
-# 五因子策略回测
+# Five-factor strategy backtesting
 python run_five_factor_backtest.py
 
-# 双阶段策略回测
+# Two-stage strategy backtesting
 python run_two_stage_backtest.py
 ```
 
-### 4. 策略优化
+### 4. Strategy Optimization
 ```bash
-# 优化五因子权重
+# Optimize five-factor weights
 python optuna_factor_weights.py --n-trials 200
 ```
 
-## 配置说明
+## Configuration Guide
 
-### 策略参数
-- `max_positions`: 最大持仓数量
-- `rotation`: 调仓频率 (daily/weekly/monthly)
-- `take_profit`: 止盈价格
-- `stop_loss`: 止损价格
-- `commission_rate`: 手续费率
-- `slippage`: 滑点成本
+### Strategy Parameters
+- `max_positions`: Maximum number of positions
+- `rotation`: Rebalancing frequency (daily/weekly/monthly)
+- `take_profit`: Take profit price
+- `stop_loss`: Stop loss price
+- `commission_rate`: Commission rate
+- `slippage`: Slippage cost
 
-### 风控参数
-- `min_price/max_price`: 价格区间限制
-- `premium_bounds`: 溢价率范围
-- `min_balance`: 最小余额要求
-- `max_volatility`: 最大波动率限制
+### Risk Control Parameters
+- `min_price/max_price`: Price range limits
+- `premium_bounds`: Premium ratio range
+- `min_balance`: Minimum balance requirement
+- `max_volatility`: Maximum volatility limit
 
-## 注意事项
+## Important Notes
 
-1. **数据质量**: 确保数据完整性和准确性，特别是停牌、退市等特殊情况
-2. **交易成本**: 回测中已考虑手续费、滑点等成本，但实际交易成本可能更高
-3. **流动性约束**: 大资金使用时需考虑流动性约束和冲击成本
-4. **风险控制**: 建议设置合理的止损和仓位控制
+1. **Data Quality**: Ensure data completeness and accuracy, especially for special cases like suspension and delisting
+2. **Trading Costs**: Backtesting considers commission, slippage, and other costs, but actual trading costs may be higher
+3. **Liquidity Constraints**: Consider liquidity constraints and impact costs when using large capital
+4. **Risk Control**: Recommend setting reasonable stop-loss and position control
 
-## 扩展方向
+## Future Extensions
 
-- **多策略组合**: 支持策略组合和动态权重调整
-- **实时交易**: 集成实盘交易接口
-- **机器学习**: 引入ML模型进行因子挖掘和择时
-- **风险管理**: 更复杂的风险模型和压力测试
+- **Multi-Strategy Portfolio**: Support strategy combination and dynamic weight adjustment
+- **Real-Time Trading**: Integrate live trading interfaces
+- **Machine Learning**: Introduce ML models for factor mining and timing
+- **Risk Management**: More complex risk models and stress testing
 
-## 贡献指南
+## Contributing Guidelines
 
-欢迎提交Issue和Pull Request来改进这个框架。在贡献代码前，请确保：
-1. 代码符合项目规范
-2. 添加必要的测试
-3. 更新相关文档
+Welcome to submit Issues and Pull Requests to improve this framework. Before contributing code, please ensure:
+1. Code complies with project standards
+2. Add necessary tests
+3. Update relevant documentation
 
-## 许可证
+## License
 
-本项目采用MIT许可证，详见LICENSE文件。
+This project is licensed under the MIT License. See LICENSE file for details.
 
-## 联系方式
+## Contact
 
-如有问题或建议，请通过GitHub Issues联系。
+For questions or suggestions, please contact through GitHub Issues.
 
 ---
 
-*本项目仅供学习和研究使用，不构成投资建议。投资有风险，入市需谨慎。*
+*This project is for learning and research purposes only and does not constitute investment advice. Investment involves risks, and market entry requires caution.*

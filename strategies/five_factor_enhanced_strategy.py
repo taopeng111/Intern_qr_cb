@@ -1,21 +1,21 @@
 """
 five_factor_enhanced_strategy.py
 ---------------------------------
-双低五因子增强策略（在“低价 + 转股溢价率”的双低基础上增强三类信号）
+Dual-low five-factor enhanced strategy (enhanced with three types of signals based on "low price + conversion premium ratio")
 
-特性概览：
-- 雷禁过滤（容量与风控）：黑名单、价格阈值、余额阈值、波动率上限、极端价-溢价联检；
-- 五因子：
-  1) 双低值（价格 + 100×溢价率），越低越好；
-  2) 双低历史分位（个券历史低位更优）；
-  3) 隐含波动率代理（20日历史波动率），越低越稳；
-  4) 价格动量（支持趋势/反转两种模式）；
-  5) 余额（可选，越低越优或按配置）；
-- 因子标准化（z-score）后加权求和，按综合分自上而下选券；
-- 调仓：默认周度（周一），先卖（止盈/止损/触发雷禁），再买（补至最大持仓数，不强制“跌出排名”卖出以减少换手）。
+Feature overview:
+- Risk filtering (capacity and risk control): blacklist, price thresholds, balance thresholds, volatility limits, extreme price-premium joint checks;
+- Five factors:
+  1) Dual-low value (price + 100×premium ratio), lower is better;
+  2) Dual-low historical percentile (individual bond historical lows preferred);
+  3) Implied volatility proxy (20-day historical volatility), lower is more stable;
+  4) Price momentum (supports trend/reversal two modes);
+  5) Balance (optional, lower is better or as configured);
+- Factor standardization (z-score) then weighted sum, select bonds top-down by composite score;
+- Rebalancing: default weekly (Monday), sell first (take profit/stop loss/trigger risk filter), then buy (fill to max positions, no forced "drop out of ranking" selling to reduce turnover).
 
-依赖：
-- data/cb_all.parquet（最少需要列：trade_date, cb_code, close, premium；可选：balance）
+Dependencies:
+- data/cb_all.parquet (minimum required columns: trade_date, cb_code, close, premium; optional: balance)
 - framework.events.MarketEvent / SignalEvent
 """
 
@@ -35,48 +35,48 @@ from constants import normalise_cb_code
 
 
 # -------------------------------------------------------------
-# 配置
+# Configuration
 # -------------------------------------------------------------
 @dataclass
 class StrategyConfig:
-    # 基础与容量
-    max_positions: int = 100              # 最大持仓数（容量友好）
-    lots_per_trade: int = 10              # 每次下单"手数"（1 手 = 10 张）
+    # Basic and capacity
+    max_positions: int = 100              # Maximum number of positions (capacity friendly)
+    lots_per_trade: int = 10              # "Lots" per order (1 lot = 10 bonds)
 
-    # 调仓节奏
+    # Rebalancing rhythm
     rotation: str = "weekly"              # daily / weekly / monthly
-    rotation_day_weekly: int = 4          # weekly: 0=周一,1=周二,2=周三,3=周四,4=周五
-    rotation_day_monthly: int = 15         # monthly: 日号
+    rotation_day_weekly: int = 4          # weekly: 0=Monday,1=Tuesday,2=Wednesday,3=Thursday,4=Friday
+    rotation_day_monthly: int = 15         # monthly: day of month
 
-    # 雷禁过滤（硬过滤）
-    min_price: float = 70.0               # 收盘价下限
-    max_price: float = 140.0              # 收盘价上限（过高价容易不稳）
-    min_balance_billion: float = 3.0      # 转债余额下限（亿元），缓解流动性
-    max_realized_vol_20d: float = 60.0    # 20日历史波动率上限（%年化近似）
-    premium_bounds: Tuple[float, float] = (-2.5, 52.5)  # 溢价率区间（%）
-    extreme_price_premium_gate: Tuple[float, float] = (145.0, 60.0)  # 价>145且溢价>60 剔除
+    # Risk filtering (hard filtering)
+    min_price: float = 70.0               # Closing price lower limit
+    max_price: float = 140.0              # Closing price upper limit (too high prices tend to be unstable)
+    min_balance_billion: float = 3.0      # Convertible bond balance lower limit (100M yuan), ease liquidity
+    max_realized_vol_20d: float = 60.0    # 20-day historical volatility upper limit (% annualized approximation)
+    premium_bounds: Tuple[float, float] = (-2.5, 52.5)  # Premium ratio range (%)
+    extreme_price_premium_gate: Tuple[float, float] = (145.0, 60.0)  # Price>145 and premium>60 exclude
     blacklist: List[str] = None
 
-    # 止盈/止损
-    take_profit: float = 135.0            # 价格止盈
-    stop_loss: float = 80.0               # 价格止损
+    # Take profit/Stop loss
+    take_profit: float = 135.0            # Price take profit
+    stop_loss: float = 80.0               # Price stop loss
 
-    # 动量参数
+    # Momentum parameters
     momentum_mode: str = "reversal"       # 'trend' or 'reversal'
-    momentum_lookback: int = 120          # 动量窗口（交易日）
+    momentum_lookback: int = 120          # Momentum window (trading days)
 
-    # 历史分位参数
-    hist_percentile_lookback: int = 252   # 历史分位回溯窗口
+    # Historical percentile parameters
+    hist_percentile_lookback: int = 252   # Historical percentile lookback window
 
-    # 隐波代理参数
-    iv_window: int = 20                   # 波动率窗口（交易日）
+    # Implied volatility proxy parameters
+    iv_window: int = 20                   # Volatility window (trading days)
 
-    # 因子权重（和为1较好，但不强制）
+    # Factor weights (sum to 1 is good, but not enforced)
     w_dual_low: float = 0.0042
     w_hist_pct: float = 0.8488
     w_low_iv: float   = 0.1132
     w_momentum: float = 0.0331
-    w_balance: float  = 0.0007              # 若无 balance 列则自动归零
+    w_balance: float  = 0.0007              # Auto-zero if no balance column
     
 
 
@@ -86,7 +86,7 @@ class StrategyConfig:
 
 
 # -------------------------------------------------------------
-# 策略实现
+# Strategy Implementation
 # -------------------------------------------------------------
 class DualLowFiveFactorStrategy:
     def __init__(self, config: StrategyConfig | None = None):
@@ -99,13 +99,13 @@ class DualLowFiveFactorStrategy:
         self._load_data()
 
     # ------------------------------
-    # 数据加载与日内取数
+    # Data loading and intraday data retrieval
     # ------------------------------
     def _load_data(self) -> None:
         data_path = Path(__file__).resolve().parent.parent / "data" / "cb_all.parquet"
         if data_path.exists():
             df = pd.read_parquet(data_path)
-            # 统一类型
+            # Unify types
             if not np.issubdtype(df["trade_date"].dtype, np.datetime64):
                 df["trade_date"] = pd.to_datetime(df["trade_date"])  # type: ignore
             df["cb_code"] = df["cb_code"].astype(str)
@@ -151,7 +151,7 @@ class DualLowFiveFactorStrategy:
         return hist
 
     # ------------------------------
-    # 调仓节奏
+    # Rebalancing rhythm
     # ------------------------------
     def _should_rotate(self, current_date: str) -> bool:
         if self.last_rotation_date == current_date:
@@ -173,7 +173,7 @@ class DualLowFiveFactorStrategy:
         return False
 
     # ------------------------------
-    # 雷禁过滤
+    # Risk filtering
     # ------------------------------
     def _apply_hard_filters(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty:
@@ -181,30 +181,30 @@ class DualLowFiveFactorStrategy:
 
         cfg = self.config
 
-        # 基础价格与溢价区间
+        # Basic price and premium range
         lo_prem, hi_prem = cfg.premium_bounds
         price_mask = df["close"].between(cfg.min_price, cfg.max_price, inclusive="both")
         premium_mask = df["premium"].between(lo_prem, hi_prem, inclusive="both")
         
         mask = price_mask & premium_mask
 
-        # 余额阈值（若有该列）
+        # Balance threshold (if column exists)
         if "balance" in df.columns:
             mask &= (df["balance"].fillna(0) >= cfg.min_balance_billion)
 
-        # 黑名单
+        # Blacklist
         if cfg.blacklist:
             bl = {normalise_cb_code(x) for x in cfg.blacklist}
             mask &= ~df["cb_code"].isin(bl)
 
-        # 极端高价 + 高溢价联检
+        # Extreme high price + high premium joint check
         px_gate, prem_gate = cfg.extreme_price_premium_gate
         mask &= ~((df["close"] > px_gate) & (df["premium"] > prem_gate))
 
         return df.loc[mask].copy()
 
     # ------------------------------
-    # 因子计算
+    # Factor calculation
     # ------------------------------
     @staticmethod
     def _zscore(series: pd.Series) -> pd.Series:
@@ -220,10 +220,10 @@ class DualLowFiveFactorStrategy:
             return daily
 
         daily = daily.copy()
-        # 双低值（越低越好）
+        # Dual-low value (lower is better)
         daily["dual_low"] = daily["close"] + 100.0 * daily["premium"].astype(float)
 
-        # 历史分位（个券内 expanding/rolling 近似）：当前值在历史中的百分位，越低越好
+        # Historical percentile (expanding/rolling within individual bond): current value's percentile in history, lower is better
         hist_pct_list: List[float] = []
         iv_list: List[float] = []
         mom_list: List[float] = []
@@ -237,10 +237,10 @@ class DualLowFiveFactorStrategy:
                 mom_list.append(np.nan)
                 continue
 
-            # 历史分位：基于双低值
+            # Historical percentile: based on dual-low value
             hist = hist.copy()
             hist["dual_low"] = hist["close"] + 100.0 * hist["premium"].astype(float)
-            # 仅用当前之前的历史
+            # Use history only before the current date
             hist_only = hist[hist["trade_date"] < pd.to_datetime(date_str)]
             if hist_only.empty:
                 hist_pct = np.nan
@@ -248,18 +248,18 @@ class DualLowFiveFactorStrategy:
                 values = hist_only["dual_low"].values
                 current_val = row["dual_low"]
                 rank = (values < current_val).sum()
-                hist_pct = rank / max(1, len(values))  # 0~1，越小越好
+                hist_pct = rank / max(1, len(values))  # 0~1, lower is better
             hist_pct_list.append(hist_pct)
 
-            # 隐波代理：20日收益率标准差 × sqrt(244)（年化近似）
+            # Implied volatility proxy: 20-day return standard deviation × sqrt(244) (annualized approximation)
             ret = hist["close"].pct_change().dropna()
             if len(ret) >= self.config.iv_window:
                 iv = ret.tail(self.config.iv_window).std(ddof=0) * math.sqrt(244)
             else:
                 iv = np.nan
-            iv_list.append(iv * 100 if np.isfinite(iv) else np.nan)  # 转百分比
+            iv_list.append(iv * 100 if np.isfinite(iv) else np.nan)  # Convert to percentage
 
-            # 动量：过去 N 日收益率
+            # Momentum: past N-day return
             if len(hist) >= self.config.momentum_lookback + 1:
                 p0 = hist["close"].iloc[-self.config.momentum_lookback - 1]
                 p1 = hist["close"].iloc[-1]
@@ -272,21 +272,21 @@ class DualLowFiveFactorStrategy:
         daily["iv20"] = pd.Series(iv_list, index=daily.index)
         daily["momentum"] = pd.Series(mom_list, index=daily.index)
 
-        # 再应用波动率硬性上限（若有）
+        # Re-apply volatility hard upper limit (if any)
         if self.config.max_realized_vol_20d is not None:
             daily = daily[(daily["iv20"].isna()) | (daily["iv20"] <= self.config.max_realized_vol_20d)].copy()
 
-        # 标准化并合成分数（方向：dual_low↓、hist_pct↓、iv20↓、momentum根据模式）
-        z_dual_low = self._zscore(-daily["dual_low"])  # 低更好 → 取负
-        z_hist_pct = self._zscore(-daily["hist_pct"])  # 低更好 → 取负
-        z_iv20 = self._zscore(-daily["iv20"])           # 低更稳 → 取负
+        # Standardize and combine scores (direction: dual_low↓, hist_pct↓, iv20↓, momentum based on mode)
+        z_dual_low = self._zscore(-daily["dual_low"])  # Lower is better → negative
+        z_hist_pct = self._zscore(-daily["hist_pct"])  # Lower is better → negative
+        z_iv20 = self._zscore(-daily["iv20"])           # Lower is more stable → negative
 
         if self.config.momentum_mode.lower() == "reversal":
-            z_mom = self._zscore(-daily["momentum"])    # 反转：近期差更好
+            z_mom = self._zscore(-daily["momentum"])    # Reversal: worse recent performance is better
         else:
-            z_mom = self._zscore(daily["momentum"])     # 趋势：近期强更好
+            z_mom = self._zscore(daily["momentum"])     # Trend: better recent performance is better
 
-        # 余额方向：一般低余额流动性更差，但也可能估值更便宜；默认轻权重且低更优
+        # Balance direction: generally lower balance liquidity is worse, but it might also be undervalued; default to light weight and lower is better
         if "balance" in daily.columns:
             z_bal = self._zscore(-daily["balance"].fillna(daily["balance"].median()))
             w_bal = self.config.w_balance
@@ -306,7 +306,7 @@ class DualLowFiveFactorStrategy:
         return daily
 
     # ------------------------------
-    # 卖出与买入信号
+    # Sell and buy signals
     # ------------------------------
     def _generate_sell_signals(self, daily: pd.DataFrame, date_str: str) -> List[SignalEvent]:
         signals: List[SignalEvent] = []
@@ -316,17 +316,17 @@ class DualLowFiveFactorStrategy:
             if not idx.empty and symbol in idx.index:
                 px = float(idx.loc[symbol, "close"])  # type: ignore
                 prem = float(idx.loc[symbol, "premium"])  # type: ignore
-                # 止盈/止损
+                # Take profit/Stop loss
                 if px >= self.config.take_profit:
                     should_sell = True
                 elif px <= self.config.stop_loss:
                     should_sell = True
-                # 极端价-溢价联检
+                # Extreme price-premium joint check
                 px_gate, prem_gate = self.config.extreme_price_premium_gate
                 if (px > px_gate) and (prem > prem_gate):
                     should_sell = True
             else:
-                # 当日无行情（停牌/缺数），保留持仓
+                # No market data for the day (trading halt/missing data), keep position
                 should_sell = False
 
             if should_sell:
@@ -342,7 +342,7 @@ class DualLowFiveFactorStrategy:
 
     def _generate_buy_signals(self, daily_scored: pd.DataFrame, date_str: str) -> List[SignalEvent]:
         signals: List[SignalEvent] = []
-        # 去掉已持仓的
+        # Exclude already held positions
         candidates = daily_scored[~daily_scored["cb_code"].isin(self.positions.keys())]
         if candidates.empty:
             return signals
@@ -362,14 +362,14 @@ class DualLowFiveFactorStrategy:
         return signals
 
     # ------------------------------
-    # 对外接口
+    # External interface
     # ------------------------------
     def calculate_signals(self, market_event: MarketEvent) -> List[SignalEvent]:
         dt = market_event.dt
         date_str = dt.strftime("%Y%m%d")
 
         if not self._should_rotate(dt):  # Pass the datetime object directly
-            # 非轮动日也打印心跳，便于观察
+            # Print heartbeat even on non-rebalancing days for observation
             if not hasattr(self, "_heartbeat"):
                 self._heartbeat = 0
             self._heartbeat += 1
@@ -378,7 +378,7 @@ class DualLowFiveFactorStrategy:
             return []
         self.last_rotation_date = date_str
 
-        # 1) 当日候选池快照 + 雷禁
+        # 1) Daily candidate pool snapshot + risk filter
         daily = self._get_daily_snapshot(date_str)
         if daily.empty:
             return []
@@ -386,12 +386,12 @@ class DualLowFiveFactorStrategy:
         if daily.empty:
             return []
 
-        # 2) 计算因子并打分
+        # 2) Calculate factors and score
         scored = self._compute_factor_snapshot(daily, date_str)
         if scored.empty or scored["score"].isna().all():
             return []
 
-        # 3) 先卖后买
+        # 3) Sell first, then buy
         signals: List[SignalEvent] = []
         sell_sigs = self._generate_sell_signals(scored, date_str)
         buy_sigs = self._generate_buy_signals(scored, date_str)
@@ -428,7 +428,7 @@ class DualLowFiveFactorStrategy:
 
 
 # -------------------------------------------------------------
-# 配置加载 / 输出
+# Configuration loading / output
 # -------------------------------------------------------------
 def load_strategy_config(config_path: str | None = None) -> StrategyConfig:
     if config_path is None:

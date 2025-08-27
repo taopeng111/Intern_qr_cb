@@ -1,124 +1,124 @@
-# GitHub上传指南
+# GitHub Upload Guide
 
-## 概述
+## Overview
 
-本指南将帮助您将可转债量化回测框架项目上传到GitHub，创建名为`Intern_qr_cb`的仓库。
+This guide will help you upload the convertible bond quantitative backtesting framework project to GitHub, creating a repository named `Intern_qr_cb`.
 
-## 步骤1: 在GitHub上创建新仓库
+## Step 1: Create New Repository on GitHub
 
-1. **访问您的GitHub账户**: [https://github.com/taopeng111](https://github.com/taopeng111)
-2. **点击"New"按钮**: 在页面右上角找到绿色的"New"按钮
-3. **填写仓库信息**:
+1. **Visit your GitHub account**: [https://github.com/taopeng111](https://github.com/taopeng111)
+2. **Click "New" button**: Find the green "New" button in the top right corner
+3. **Fill in repository information**:
    - **Repository name**: `Intern_qr_cb`
-   - **Description**: `可转债量化回测框架 - Convertible Bond Quantitative Backtesting Framework`
-   - **Visibility**: 选择 Public（公开）或 Private（私有）
-   - **不要勾选**: "Add a README file"、"Add .gitignore"、"Choose a license"
-4. **点击"Create repository"**
+   - **Description**: `Convertible Bond Quantitative Backtesting Framework - Convertible Bond Quantitative Backtesting Framework`
+   - **Visibility**: Choose Public or Private
+   - **Do NOT check**: "Add a README file", "Add .gitignore", "Choose a license"
+4. **Click "Create repository"**
 
-## 步骤2: 上传项目到GitHub
+## Step 2: Upload Project to GitHub
 
-### 方法1: 使用Python脚本（推荐）
+### Method 1: Using Python Script (Recommended)
 
 ```bash
 python upload_to_github.py
 ```
 
-### 方法2: 使用批处理文件（Windows）
+### Method 2: Using Batch File (Windows)
 
-双击运行 `upload_to_github.bat`
+Double-click to run `upload_to_github.bat`
 
-### 方法3: 手动执行Git命令
+### Method 3: Manual Git Commands
 
 ```bash
-# 1. 添加所有文件
+# 1. Add all files
 git add .
 
-# 2. 提交更改
+# 2. Commit changes
 git commit -m "Complete project setup with comprehensive README and all strategies"
 
-# 3. 添加新的远程仓库
+# 3. Add new remote repository
 git remote add origin_new https://github.com/taopeng111/Intern_qr_cb.git
 
-# 4. 推送到GitHub
+# 4. Push to GitHub
 git push -u origin_new Ak
 ```
 
-## 步骤3: 验证上传结果
+## Step 3: Verify Upload Results
 
-1. 访问您的GitHub仓库: [https://github.com/taopeng111/Intern_qr_cb](https://github.com/taopeng111/Intern_qr_cb)
-2. 确认所有文件都已上传
-3. 检查README.md是否正确显示
+1. Visit your GitHub repository: [https://github.com/taopeng111/Intern_qr_cb](https://github.com/taopeng111/Intern_qr_cb)
+2. Confirm all files have been uploaded
+3. Check if README.md displays correctly
 
-## 项目结构说明
+## Project Structure Description
 
-上传完成后，您的GitHub仓库将包含以下内容：
+After upload completion, your GitHub repository will contain:
 
 ```
 Intern_qr_cb/
-├── README.md                           # 项目说明文档
-├── constants.py                        # 全局常量和配置
-├── CB_Data_Dictionary.txt             # 可转债数据字典
-├── data/                              # 数据相关模块
-├── framework/                         # 回测框架核心
-├── strategies/                        # 投资策略实现
-├── run_*.py                          # 回测运行脚本
-├── portfolio_backtest.py              # 投资组合回测框架
-├── perf_metrics.py                    # 性能指标计算
-├── optuna_factor_weights.py           # 因子权重优化
-├── upload_to_github.py                # GitHub上传助手
-├── upload_to_github.bat               # Windows批处理文件
-└── GITHUB_UPLOAD_GUIDE.md            # 本指南
+├── README.md                           # Project documentation
+├── constants.py                        # Global constants and configuration
+├── CB_Data_Dictionary.txt             # Convertible bond data dictionary
+├── data/                              # Data-related modules
+├── framework/                         # Backtesting framework core
+├── strategies/                        # Investment strategy implementations
+├── run_*.py                          # Backtesting run scripts
+├── portfolio_backtest.py              # Portfolio backtesting framework
+├── perf_metrics.py                    # Performance metrics calculation
+├── optuna_factor_weights.py           # Factor weight optimization
+├── upload_to_github.py                # GitHub upload assistant
+├── upload_to_github.bat               # Windows batch file
+└── GITHUB_UPLOAD_GUIDE.md            # This guide
 ```
 
-## 常见问题解决
+## Common Problem Solutions
 
-### 1. 推送失败 - 仓库不存在
-**错误信息**: `fatal: repository 'https://github.com/taopeng111/Intern_qr_cb.git/' not found`
+### 1. Push Failed - Repository Doesn't Exist
+**Error message**: `fatal: repository 'https://github.com/taopeng111/Intern_qr_cb.git/' not found`
 
-**解决方案**: 确保您已经在GitHub上创建了名为`Intern_qr_cb`的仓库
+**Solution**: Ensure you have created a repository named `Intern_qr_cb` on GitHub
 
-### 2. 权限问题
-**错误信息**: `remote: Permission to taopeng111/Intern_qr_cb.git denied`
+### 2. Permission Issues
+**Error message**: `remote: Permission to taopeng111/Intern_qr_cb.git denied`
 
-**解决方案**: 
-- 确保您已登录正确的GitHub账户
-- 检查仓库是否为私有仓库，如果是，确保您有访问权限
+**Solution**: 
+- Ensure you are logged into the correct GitHub account
+- Check if the repository is private, if so, ensure you have access permissions
 
-### 3. 分支问题
-**错误信息**: `error: src refspec Ak does not match any`
+### 3. Branch Issues
+**Error message**: `error: src refspec Ak does not match any`
 
-**解决方案**: 当前项目使用`Ak`分支，如果推送失败，可以尝试：
+**Solution**: The current project uses the `Ak` branch. If push fails, try:
 ```bash
 git push -u origin_new main
-# 或者
+# or
 git push -u origin_new master
 ```
 
-## 后续操作
+## Follow-up Operations
 
-### 1. 设置默认分支
-在GitHub仓库设置中，将`Ak`分支设置为默认分支
+### 1. Set Default Branch
+In GitHub repository settings, set the `Ak` branch as the default branch
 
-### 2. 添加仓库描述
-在仓库主页添加更详细的描述和标签
+### 2. Add Repository Description
+Add more detailed descriptions and tags on the repository homepage
 
-### 3. 设置仓库主题
-添加相关主题标签，如：`quantitative-finance`, `backtesting`, `convertible-bonds`, `python`
+### 3. Set Repository Topics
+Add relevant topic tags such as: `quantitative-finance`, `backtesting`, `convertible-bonds`, `python`
 
-### 4. 邀请协作者（可选）
-如果需要团队协作，可以在仓库设置中邀请其他开发者
+### 4. Invite Collaborators (Optional)
+If team collaboration is needed, you can invite other developers in repository settings
 
-## 联系支持
+## Contact Support
 
-如果在上传过程中遇到问题，请：
-1. 检查本指南的常见问题部分
-2. 查看Git错误信息
-3. 确保GitHub账户设置正确
+If you encounter problems during upload, please:
+1. Check the common problems section of this guide
+2. Review Git error messages
+3. Ensure GitHub account settings are correct
 
 ---
 
-**注意**: 本指南假设您已经在本地机器上安装了Git，并且已经配置了GitHub的用户名和邮箱。如果还没有配置，请先运行：
+**Note**: This guide assumes you have Git installed on your local machine and have configured your GitHub username and email. If not yet configured, please run first:
 ```bash
-git config --global user.name "您的GitHub用户名"
-git config --global user.email "您的邮箱"
+git config --global user.name "Your GitHub Username"
+git config --global user.email "Your Email"
 ```
